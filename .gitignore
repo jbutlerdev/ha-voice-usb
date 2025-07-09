@@ -1,0 +1,41 @@
+# ESPHome build artifacts
+/.esphome/
+/secrets.yaml
+/.pioenvs/
+/.piolibdeps/
+/.pio/
+
+# Python virtual environment
+venv/
+env/
+.venv/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Build artifacts
+build/
+dist/
+*.bin
+*.elf
+
+# Backup files
+*.bak
+*.backup
+
+# OS specific
+Thumbs.db
