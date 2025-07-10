@@ -1763,7 +1763,7 @@ micro_wake_word:
   microphone:
     microphone: i2s_mics
     channels: 1
-    gain_factor: 16  # Much higher gain to detect real speech
+    gain_factor: 4  # Much higher gain to detect real speech
   stop_after_detection: false
   models:
     - model: https://github.com/kahrendt/microWakeWord/releases/download/okay_nabu_20241226.3/okay_nabu.json
@@ -2015,40 +2015,26 @@ interval:
                 converted_samples.clear();
                 converted_samples.reserve(sample_count_32 / 2); // Stereo to mono conversion
                 
-                // Process stereo pairs: try right channel instead of left
+                // Process stereo pairs: use channel 0 (left channel) as per factory firmware
                 for (size_t i = 0; i < sample_count_32; i += 2) {
-                  // ESP32 I2S microphone data format varies - try different approaches
-                  // Use right channel (i+1) instead of left channel (i)
-                  int32_t sample_32 = (i + 1 < sample_count_32) ? samples_32[i + 1] : samples_32[i];
+                  // ESP32 I2S microphone data format: use channel 0 for voice assistant pipeline
+                  // Use left channel (i) as per factory firmware configuration
+                  int32_t sample_32 = samples_32[i];
                   int16_t sample_16;
                   
-                  // Try the most common ESP32 I2S format: 24-bit data in upper 24 bits
-                  if (abs(sample_32) > 0x800000) {
-                    // Data appears to be in upper 24 bits
-                    sample_16 = static_cast<int16_t>(sample_32 >> 16);
-                  } else if (abs(sample_32) > 0x8000) {
-                    // Data appears to be in middle 16 bits
-                    sample_16 = static_cast<int16_t>(sample_32 >> 8);
-                  } else {
-                    // Data appears to be in lower 16 bits already
-                    sample_16 = static_cast<int16_t>(sample_32);
-                  }
+                  // ESP32-S3 with AIC3204: 24-bit data in upper 24 bits of 32-bit word
+                  // Factory firmware standard: shift right by 16 to get 16-bit sample
+                  sample_16 = static_cast<int16_t>(sample_32 >> 16);
                   
-                  // Try inverting the signal in case it's phase-inverted and add slight amplification
-                  int32_t amplified = -sample_16 * 2; // 2x gain for better clarity
+                  // Use sample directly without inversion or excessive amplification
+                  // Factory firmware uses clean signal processing without phase inversion
+                  int32_t processed = static_cast<int32_t>(sample_16);
                   
-                  // Apply soft limiting instead of hard clipping
-                  if (amplified > 16000) {
-                    amplified = 16000 + (amplified - 16000) / 4; // Soft limit
-                  } else if (amplified < -16000) {
-                    amplified = -16000 + (amplified + 16000) / 4; // Soft limit
-                  }
+                  // Gentle limiting to prevent clipping
+                  if (processed > INT16_MAX) processed = INT16_MAX;
+                  if (processed < INT16_MIN) processed = INT16_MIN;
                   
-                  // Final clamp to 16-bit range
-                  if (amplified > INT16_MAX) amplified = INT16_MAX;
-                  if (amplified < INT16_MIN) amplified = INT16_MIN;
-                  
-                  converted_samples.push_back(static_cast<int16_t>(amplified));
+                  converted_samples.push_back(static_cast<int16_t>(processed));
                 }
                 
                 const int16_t* samples = converted_samples.data();
